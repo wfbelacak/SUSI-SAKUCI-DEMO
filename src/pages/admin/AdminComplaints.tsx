@@ -1,98 +1,67 @@
 import { useState } from "react";
 import { Layout } from "@/components/Layout";
 import { ComplaintCard } from "@/components/ComplaintCard";
-import { StatusBadge, ComplaintStatus } from "@/components/StatusBadge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Filter, Calendar, SlidersHorizontal } from "lucide-react";
+import { Search, Filter, Calendar, SlidersHorizontal, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useInputAspirasiList, useKategoriList } from "@/hooks/useApi";
+import { useAuth } from "@/contexts/AuthContext";
+import type { ComplaintStatus } from "@/components/StatusBadge";
 
-const allComplaints = [
-  {
-    id: "1",
-    title: "AC Ruang Kelas XI IPA 1 Rusak",
-    description: "AC di ruang kelas tidak berfungsi sejak seminggu yang lalu, membuat suasana belajar tidak nyaman karena cuaca panas.",
-    category: "Ruang Kelas",
-    location: "Gedung A Lantai 2",
-    status: "pending" as ComplaintStatus,
-    date: "13 Jan 2026",
-    studentName: "Ahmad Fauzi",
-  },
-  {
-    id: "2",
-    title: "Keran Air Toilet Bocor",
-    description: "Keran air di toilet putra lantai 1 mengalami kebocoran yang cukup parah, air terus mengalir dan terbuang percuma.",
-    category: "Toilet",
-    location: "Toilet Putra Lantai 1",
-    status: "in_progress" as ComplaintStatus,
-    date: "12 Jan 2026",
-    studentName: "Budi Santoso",
-  },
-  {
-    id: "3",
-    title: "Komputer Lab 5 Error",
-    description: "5 unit komputer di lab komputer tidak bisa menyala, mengganggu praktikum siswa yang membutuhkan komputer.",
-    category: "Lab Komputer",
-    location: "Lab Komputer 2",
-    status: "completed" as ComplaintStatus,
-    date: "11 Jan 2026",
-    studentName: "Siti Rahayu",
-  },
-  {
-    id: "4",
-    title: "Lampu Koridor Mati",
-    description: "Beberapa lampu di koridor gedung B tidak menyala, membuat area menjadi gelap di malam hari.",
-    category: "Fasilitas Umum",
-    location: "Gedung B Lantai 1",
-    status: "pending" as ComplaintStatus,
-    date: "10 Jan 2026",
-    studentName: "Dewi Lestari",
-  },
-  {
-    id: "5",
-    title: "Kursi Kelas Patah",
-    description: "Ada 3 kursi di kelas XII IPS 2 yang patah kakinya dan berbahaya jika diduduki.",
-    category: "Ruang Kelas",
-    location: "Gedung C Lantai 3",
-    status: "in_progress" as ComplaintStatus,
-    date: "9 Jan 2026",
-    studentName: "Rudi Hartono",
-  },
-  {
-    id: "6",
-    title: "Proyektor Rusak",
-    description: "Proyektor di ruang multimedia tidak menampilkan gambar dengan jelas, sudah buram.",
-    category: "Ruang Kelas",
-    location: "Ruang Multimedia",
-    status: "rejected" as ComplaintStatus,
-    date: "8 Jan 2026",
-    studentName: "Nina Safitri",
-  },
-];
+// Map database status to UI status
+const mapStatus = (status: string | undefined): ComplaintStatus => {
+  switch (status) {
+    case 'Menunggu': return 'pending';
+    case 'Proses': return 'in_progress';
+    case 'Selesai': return 'completed';
+    default: return 'pending';
+  }
+};
 
 export default function AdminComplaints() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [activeTab, setActiveTab] = useState("all");
   const navigate = useNavigate();
+  const { admin } = useAuth();
 
-  const filteredComplaints = allComplaints.filter((complaint) => {
-    const matchesSearch =
-      complaint.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      complaint.studentName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || complaint.category === selectedCategory;
-    const matchesStatus = activeTab === "all" || complaint.status === activeTab;
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+  // Pelaksana only sees approved complaints; Admin sees all
+  const isPelaksana = admin?.posisi === 'Pelaksana';
+  const statusReviewFilter = isPelaksana ? 'diterima' : undefined;
 
+  // Fetch data from API
+  const { data: complaintsData, isLoading } = useInputAspirasiList(statusReviewFilter);
+  const { data: kategoriData } = useKategoriList();
+  
+  const allComplaints = complaintsData?.data || [];
+  const categories = kategoriData?.data || [];
+
+  // Filter and sort complaints (newest first)
+  const filteredComplaints = allComplaints
+    .filter((complaint) => {
+      const matchesSearch =
+        complaint.keterangan.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        complaint.lokasi.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (complaint.siswa?.nama?.toLowerCase().includes(searchQuery.toLowerCase()) || false);
+      const matchesCategory = selectedCategory === "all" || String(complaint.id_kategori) === selectedCategory;
+      
+      const complaintStatus = mapStatus(complaint.aspirasi?.[0]?.status);
+      const matchesStatus = activeTab === "all" || complaintStatus === activeTab;
+      
+      return matchesSearch && matchesCategory && matchesStatus;
+    })
+    .sort((a, b) => b.id_pelaporan - a.id_pelaporan); // Sort by newest first
+
+  // Calculate status counts
   const statusCounts = {
     all: allComplaints.length,
-    pending: allComplaints.filter((c) => c.status === "pending").length,
-    in_progress: allComplaints.filter((c) => c.status === "in_progress").length,
-    completed: allComplaints.filter((c) => c.status === "completed").length,
-    rejected: allComplaints.filter((c) => c.status === "rejected").length,
+    pending: allComplaints.filter(c => mapStatus(c.aspirasi?.[0]?.status) === 'pending').length,
+    in_progress: allComplaints.filter(c => mapStatus(c.aspirasi?.[0]?.status) === 'in_progress').length,
+    completed: allComplaints.filter(c => mapStatus(c.aspirasi?.[0]?.status) === 'completed').length,
+    rejected: 0,
   };
 
   return (
@@ -109,7 +78,7 @@ export default function AdminComplaints() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Cari judul atau nama siswa..."
+              placeholder="Cari keterangan, lokasi, atau nama siswa..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -123,10 +92,11 @@ export default function AdminComplaints() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Semua Kategori</SelectItem>
-                <SelectItem value="Ruang Kelas">Ruang Kelas</SelectItem>
-                <SelectItem value="Toilet">Toilet</SelectItem>
-                <SelectItem value="Lab Komputer">Lab Komputer</SelectItem>
-                <SelectItem value="Fasilitas Umum">Fasilitas Umum</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.id_kategori} value={String(cat.id_kategori)}>
+                    {cat.ket_kategori}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Button variant="outline">
@@ -138,7 +108,7 @@ export default function AdminComplaints() {
 
         {/* Status Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-5 w-full md:w-auto md:inline-flex">
+          <TabsList className="grid grid-cols-4 w-full md:w-auto md:inline-flex">
             <TabsTrigger value="all" className="text-xs md:text-sm">
               Semua ({statusCounts.all})
             </TabsTrigger>
@@ -151,13 +121,14 @@ export default function AdminComplaints() {
             <TabsTrigger value="completed" className="text-xs md:text-sm">
               Selesai ({statusCounts.completed})
             </TabsTrigger>
-            <TabsTrigger value="rejected" className="text-xs md:text-sm">
-              Ditolak ({statusCounts.rejected})
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab} className="mt-6">
-            {filteredComplaints.length === 0 ? (
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : filteredComplaints.length === 0 ? (
               <div className="text-center py-12">
                 <SlidersHorizontal className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-foreground mb-2">Tidak ada pengaduan</h3>
@@ -169,9 +140,16 @@ export default function AdminComplaints() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredComplaints.map((complaint) => (
                   <ComplaintCard
-                    key={complaint.id}
-                    {...complaint}
-                    onClick={() => navigate(`/admin/complaints/${complaint.id}`)}
+                    key={complaint.id_pelaporan}
+                    id={String(complaint.id_pelaporan)}
+                    title={complaint.keterangan.substring(0, 50) + (complaint.keterangan.length > 50 ? '...' : '')}
+                    description={complaint.keterangan}
+                    category={complaint.kategori?.ket_kategori || 'Umum'}
+                    location={complaint.lokasi}
+                    status={mapStatus(complaint.aspirasi?.[0]?.status)}
+                    date={new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    studentName={complaint.siswa?.nama || 'Siswa'}
+                    onClick={() => navigate(`/admin/complaints/${complaint.id_pelaporan}`)}
                   />
                 ))}
               </div>

@@ -1,231 +1,209 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { Layout } from "@/components/Layout";
-import { StatusBadge } from "@/components/StatusBadge";
-import { ProgressTracker } from "@/components/ProgressTracker";
+import { StudentLayout } from "@/components/StudentLayout";
+import { StatusBadge, ComplaintStatus } from "@/components/StatusBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, MapPin, Calendar, Send, ImageIcon, MessageCircle } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, MapPin, Calendar, Tag, User, MessageSquare, Loader2 } from "lucide-react";
+import { useInputAspirasiDetail } from "@/hooks/useApi";
 
-const complaintData = {
-  id: "1",
-  title: "AC Ruang Kelas XI IPA 1 Rusak",
-  description:
-    "AC di ruang kelas tidak berfungsi sejak seminggu yang lalu, membuat suasana belajar tidak nyaman karena cuaca yang sangat panas. Sudah dilaporkan ke petugas kebersihan tetapi belum ada tindak lanjut.",
-  category: "Ruang Kelas",
-  location: "Gedung A Lantai 2, Ruang 201",
-  status: "in_progress" as const,
-  date: "13 Januari 2026",
+// Map database status to UI status
+const mapStatus = (status: string | undefined): ComplaintStatus => {
+  switch (status) {
+    case 'Menunggu': return 'pending';
+    case 'Proses': return 'in_progress';
+    case 'Selesai': return 'completed';
+    default: return 'pending';
+  }
 };
-
-const progressSteps = [
-  {
-    id: 1,
-    title: "Pengaduan Diterima",
-    description: "Pengaduan berhasil dikirim dan masuk ke sistem",
-    status: "completed" as const,
-    date: "13 Jan 2026, 08:30",
-  },
-  {
-    id: 2,
-    title: "Sedang Ditinjau",
-    description: "Tim sarana prasarana sedang meninjau laporan",
-    status: "completed" as const,
-    date: "13 Jan 2026, 10:15",
-  },
-  {
-    id: 3,
-    title: "Dalam Pengerjaan",
-    description: "Teknisi sedang memperbaiki AC yang rusak",
-    status: "current" as const,
-    date: "14 Jan 2026, 09:00",
-  },
-  {
-    id: 4,
-    title: "Selesai",
-    description: "Perbaikan telah selesai dilakukan",
-    status: "pending" as const,
-  },
-];
-
-const feedbackHistory = [
-  {
-    id: 1,
-    sender: "Admin",
-    message: "Terima kasih atas laporannya. Kami sudah menugaskan teknisi untuk memeriksa AC tersebut.",
-    date: "13 Jan 2026, 10:30",
-    isAdmin: true,
-  },
-  {
-    id: 2,
-    sender: "Ahmad Fauzi",
-    message: "Baik, terima kasih. Mohon segera ditangani ya karena sudah tidak nyaman belajar di kelas.",
-    date: "13 Jan 2026, 11:00",
-    isAdmin: false,
-  },
-  {
-    id: 3,
-    sender: "Admin",
-    message: "Teknisi sudah mulai memeriksa AC. Kemungkinan perlu penggantian spare part. Estimasi selesai 1-2 hari.",
-    date: "14 Jan 2026, 09:15",
-    isAdmin: true,
-  },
-];
 
 export default function StudentComplaintDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [newMessage, setNewMessage] = useState("");
+  
+  // Fetch complaint detail from API
+  const { data: complaintData, isLoading, error } = useInputAspirasiDetail(Number(id));
+  const complaint = complaintData?.data;
 
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      // Handle sending message
-      setNewMessage("");
-    }
-  };
+  if (isLoading) {
+    return (
+      <StudentLayout>
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </StudentLayout>
+    );
+  }
+
+  if (error || !complaint) {
+    return (
+      <StudentLayout>
+        <div className="text-center py-12">
+          <h2 className="text-xl font-semibold mb-2">Pengaduan tidak ditemukan</h2>
+          <p className="text-muted-foreground mb-4">ID: {id}</p>
+          <Button onClick={() => navigate("/student/complaints")}>
+            Kembali ke Daftar Pengaduan
+          </Button>
+        </div>
+      </StudentLayout>
+    );
+  }
+
+  const latestAspirasi = complaint.aspirasi?.[0];
+  const status = mapStatus(latestAspirasi?.status);
 
   return (
-    <Layout role="student">
-      <div className="space-y-6 animate-fade-in">
+    <StudentLayout>
+      <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
         {/* Back button */}
-        <Button
-          variant="ghost"
-          className="gap-2"
-          onClick={() => navigate("/student/complaints")}
-        >
+        <Button variant="ghost" className="gap-2" onClick={() => navigate("/student/complaints")}>
           <ArrowLeft className="w-4 h-4" />
-          Kembali ke Pengaduan Saya
+          Kembali
         </Button>
 
+        {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main content */}
+          {/* Complaint Details */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Complaint detail card */}
             <Card>
               <CardHeader>
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <span className="px-2.5 py-0.5 bg-primary/10 text-primary text-xs font-medium rounded-md">
-                    {complaintData.category}
-                  </span>
-                  <StatusBadge status={complaintData.status} />
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-xl mb-2">
+                      Pengaduan #{complaint.id_pelaporan}
+                    </CardTitle>
+                    <StatusBadge status={status} />
+                  </div>
                 </div>
-                <CardTitle className="text-xl md:text-2xl">{complaintData.title}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <p className="text-muted-foreground leading-relaxed">
-                  {complaintData.description}
-                </p>
-
-                <div className="flex flex-wrap gap-4 text-sm">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <MapPin className="w-4 h-4" />
-                    <span>{complaintData.location}</span>
+                {/* Info Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Tag className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Kategori:</span>
+                    <span className="font-medium">{complaint.kategori?.ket_kategori || 'Umum'}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar className="w-4 h-4" />
-                    <span>{complaintData.date}</span>
+                  <div className="flex items-center gap-2 text-sm">
+                    <MapPin className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Lokasi:</span>
+                    <span className="font-medium">{complaint.lokasi}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <User className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Pelapor:</span>
+                    <span className="font-medium">{complaint.siswa?.nama || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">NIS:</span>
+                    <span className="font-medium">{complaint.nis}</span>
                   </div>
                 </div>
 
-                {/* Images placeholder */}
-                <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-                  <ImageIcon className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
-                  <p className="text-sm text-muted-foreground">Tidak ada foto terlampir</p>
+                {/* Description */}
+                <div>
+                  <h3 className="font-semibold mb-2">Deskripsi Pengaduan</h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    {complaint.keterangan}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Feedback section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <MessageCircle className="w-5 h-5" />
-                  Komunikasi dengan Admin
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-4 max-h-[400px] overflow-y-auto">
-                  {feedbackHistory.map((feedback) => (
-                    <div
-                      key={feedback.id}
-                      className={`flex gap-3 ${feedback.isAdmin ? "" : "flex-row-reverse"}`}
-                    >
-                      <Avatar className="w-8 h-8 flex-shrink-0">
-                        <AvatarFallback
-                          className={
-                            feedback.isAdmin
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-accent text-accent-foreground"
-                          }
-                        >
-                          {feedback.sender.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div
-                        className={`flex-1 max-w-[80%] ${
-                          feedback.isAdmin ? "" : "flex flex-col items-end"
-                        }`}
-                      >
-                        <div
-                          className={`rounded-lg p-3 ${
-                            feedback.isAdmin
-                              ? "bg-muted"
-                              : "bg-primary text-primary-foreground"
-                          }`}
-                        >
-                          <p className="text-sm font-medium mb-1">{feedback.sender}</p>
-                          <p className="text-sm">{feedback.message}</p>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">{feedback.date}</p>
-                      </div>
+                {/* Photo */}
+                {complaint.foto_dokumentasi && (
+                  <div>
+                    <h3 className="font-semibold mb-2">Foto Dokumentasi</h3>
+                    <div className="rounded-lg overflow-hidden border">
+                      <img 
+                        src={complaint.foto_dokumentasi} 
+                        alt="Dokumentasi" 
+                        className="w-full h-auto"
+                      />
                     </div>
-                  ))}
-                </div>
-
-                <div className="flex gap-2 pt-4 border-t">
-                  <Textarea
-                    placeholder="Tulis pesan..."
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    className="min-h-[80px]"
-                  />
-                  <Button
-                    className="btn-primary-gradient self-end"
-                    onClick={handleSendMessage}
-                  >
-                    <Send className="w-4 h-4" />
-                  </Button>
-                </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
+
+            {/* Response from Admin */}
+            {latestAspirasi && latestAspirasi.detail_tanggapan && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5" />
+                    Tanggapan Admin
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="bg-muted/50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="font-medium">{latestAspirasi.admin?.nama_admin || 'Admin'}</span>
+                      <span className="text-xs text-muted-foreground">
+                        ({latestAspirasi.admin?.posisi || 'Staff'})
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground">{latestAspirasi.detail_tanggapan}</p>
+                    {latestAspirasi.foto_tanggapan && (
+                      <div className="mt-3 rounded-lg overflow-hidden border">
+                        <img 
+                          src={latestAspirasi.foto_tanggapan} 
+                          alt="Foto Tanggapan" 
+                          className="w-full h-auto"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Progress tracker */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Progress Penyelesaian</CardTitle>
+                <CardTitle className="text-lg">Status Pengaduan</CardTitle>
               </CardHeader>
               <CardContent>
-                <ProgressTracker steps={progressSteps} />
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${status === 'completed' ? 'bg-green-500' : status === 'in_progress' ? 'bg-blue-500' : 'bg-yellow-500'}`} />
+                    <div>
+                      <p className="font-medium">
+                        {status === 'completed' ? 'Selesai' : status === 'in_progress' ? 'Sedang Diproses' : 'Menunggu'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Status saat ini</p>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Info card */}
-            <Card className="bg-muted/50 border-muted">
-              <CardContent className="p-4">
-                <h4 className="font-semibold text-foreground mb-2">💡 Informasi</h4>
-                <p className="text-sm text-muted-foreground">
-                  Kamu akan menerima notifikasi setiap kali ada update status pengaduan. Tetap pantau progress di halaman ini.
-                </p>
-              </CardContent>
-            </Card>
+            {/* Feedback Rating if completed */}
+            {status === 'completed' && latestAspirasi?.feedback && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Rating</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <span 
+                        key={star} 
+                        className={`text-2xl ${star <= latestAspirasi.feedback! ? 'text-yellow-400' : 'text-gray-300'}`}
+                      >
+                        ★
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {latestAspirasi.feedback}/5 bintang
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
-    </Layout>
+    </StudentLayout>
   );
 }

@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 @layer base {
   :root {
@@ -170,6 +170,21 @@
     animation: scaleIn 0.3s ease-out forwards;
   }
 
+  .animate-slide-right {
+    animation: slideRight 0.4s ease-out forwards;
+  }
+
+  .animate-bounce-soft {
+    animation: bounceSoft 0.5s ease-out;
+  }
+
+  /* Staggered animations for list items */
+  .stagger-1 { animation-delay: 0.05s; }
+  .stagger-2 { animation-delay: 0.1s; }
+  .stagger-3 { animation-delay: 0.15s; }
+  .stagger-4 { animation-delay: 0.2s; }
+  .stagger-5 { animation-delay: 0.25s; }
+
   @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -184,4 +199,222 @@
     from { opacity: 0; transform: scale(0.95); }
     to { opacity: 1; transform: scale(1); }
   }
+
+  @keyframes slideRight {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes bounceSoft {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+
+  /* Skeleton loading pulse */
+  .skeleton-pulse {
+    @apply bg-muted animate-pulse rounded;
+  }
+
+  /* Smooth transitions for interactive elements */
+  .transition-smooth {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  /* Card lift effect on hover */
+  .hover-lift {
+    @apply transition-all duration-300;
+  }
+  .hover-lift:hover {
+    @apply -translate-y-1 shadow-lg;
+  }
+
+  /* Focus ring for accessibility */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
+  }
+
+  /* Bottom nav safe area for mobile */
+  .pb-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 5rem);
+  }
+
+  /* Safe area insets for notched devices */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .px-safe {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Mobile-first responsive text */
+  .text-responsive-xs {
+    @apply text-xs sm:text-sm;
+  }
+
+  .text-responsive-sm {
+    @apply text-sm sm:text-base;
+  }
+
+  .text-responsive-base {
+    @apply text-base sm:text-lg;
+  }
+
+  .text-responsive-lg {
+    @apply text-lg sm:text-xl md:text-2xl;
+  }
+
+  .text-responsive-xl {
+    @apply text-xl sm:text-2xl md:text-3xl;
+  }
+
+  .text-responsive-2xl {
+    @apply text-2xl sm:text-3xl md:text-4xl;
+  }
+
+  /* Responsive padding */
+  .p-responsive {
+    @apply p-3 sm:p-4 md:p-6;
+  }
+
+  .px-responsive {
+    @apply px-3 sm:px-4 md:px-6;
+  }
+
+  .py-responsive {
+    @apply py-3 sm:py-4 md:py-6;
+  }
+
+  /* Responsive gaps */
+  .gap-responsive {
+    @apply gap-3 sm:gap-4 md:gap-6;
+  }
+
+  /* Touch-friendly button sizes */
+  .btn-touch {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Mobile card adjustments */
+  .card-mobile {
+    @apply p-3 sm:p-4 md:p-6;
+  }
+
+  /* Hide on mobile */
+  .hide-mobile {
+    @apply hidden sm:block;
+  }
+
+  /* Show only on mobile */
+  .show-mobile {
+    @apply block sm:hidden;
+  }
+
+  /* Mobile-friendly grid */
+  .grid-responsive-2 {
+    @apply grid grid-cols-1 sm:grid-cols-2;
+  }
+
+  .grid-responsive-3 {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3;
+  }
+
+  .grid-responsive-4 {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+  }
+
+  /* Responsive flex direction */
+  .flex-responsive {
+    @apply flex flex-col sm:flex-row;
+  }
+
+  /* Full width on mobile, auto on larger */
+  .w-responsive {
+    @apply w-full sm:w-auto;
+  }
+
+  /* Mobile scrollable container */
+  .scroll-x-mobile {
+    @apply overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible;
+  }
+
+  /* Truncate text on mobile */
+  .truncate-mobile {
+    @apply truncate sm:whitespace-normal;
+  }
+
+  /* Responsive image container */
+  .img-responsive {
+    @apply w-full h-auto object-cover;
+  }
+
+  /* Mobile-friendly modal */
+  .modal-mobile {
+    @apply max-h-[90vh] overflow-y-auto;
+  }
+
+  /* Container with max width */
+  .container-responsive {
+    @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Stack on mobile, inline on desktop */
+  .stack-mobile {
+    @apply flex flex-col gap-2 sm:flex-row sm:items-center;
+  }
+
+  /* Mobile table scroll wrapper */
+  .table-responsive {
+    @apply overflow-x-auto -mx-4 sm:mx-0;
+  }
+
+  .table-responsive > table {
+    @apply min-w-full;
+  }
+
+  /* Input touch-friendly */
+  .input-touch {
+    @apply h-11 text-base;
+  }
+
+  /* Mobile navigation bottom padding */
+  .nav-bottom-padding {
+    @apply pb-20 sm:pb-4;
+  }
 }
+
+/* Media query based styles */
+@media (max-width: 640px) {
+  /* Smaller fonts on mobile */
+  h1 { font-size: 1.5rem !important; }
+  h2 { font-size: 1.25rem !important; }
+  h3 { font-size: 1.125rem !important; }
+
+  /* Touch-friendly tap targets */
+  button, a, [role="button"] {
+    min-height: 44px;
+  }
+
+  /* Adjust modal positioning */
+  [role="dialog"] {
+    margin: 0.5rem;
+    max-width: calc(100vw - 1rem);
+  }
+}
+
+/* Landscape mode adjustments */
+@media (max-height: 500px) and (orientation: landscape) {
+  .pb-safe {
+    padding-bottom: 3rem;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+

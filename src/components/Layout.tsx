@@ -8,11 +8,13 @@ import {
   LogOut,
   Menu,
   X,
-  Bell,
   User,
   PlusCircle,
   BarChart3,
   Users,
+  Tag,
+  CheckCircle2,
+  Archive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -25,18 +27,34 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { LogoutConfirmDialog } from "@/components/LogoutConfirmDialog";
+import { NotificationBell } from "@/components/NotificationBell";
 
 interface LayoutProps {
   children: ReactNode;
   role: "admin" | "student";
 }
 
-const adminNavItems = [
+// Admin Sistem (full access)
+const adminSystemNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
+  { icon: CheckCircle2, label: "Review Pengaduan", path: "/admin/review" },
   { icon: FileText, label: "Semua Pengaduan", path: "/admin/complaints" },
-  { icon: BarChart3, label: "Statistik", path: "/admin/statistics" },
+  { icon: MessageSquare, label: "Saran & Pesan", path: "/admin/saran" },
   { icon: Users, label: "Data Siswa", path: "/admin/students" },
+  { icon: Tag, label: "Data Kategori", path: "/admin/categories" },
+  { icon: BarChart3, label: "Statistik", path: "/admin/statistics" },
+  { icon: Archive, label: "Arsip", path: "/admin/arsip" },
   { icon: History, label: "Histori", path: "/admin/history" },
+];
+
+// Pelaksana (limited access)
+const pelaksanaNavItems = [
+  { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
+  { icon: FileText, label: "Pengaduan Terbaru", path: "/admin/complaints" },
+  { icon: History, label: "History Pengaduan", path: "/admin/history" },
 ];
 
 const studentNavItems = [
@@ -49,19 +67,53 @@ const studentNavItems = [
 
 export function Layout({ children, role }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { siswa, admin, logout } = useAuth();
 
-  const navItems = role === "admin" ? adminNavItems : studentNavItems;
-  const userName = role === "admin" ? "Admin Sekolah" : "Ahmad Fauzi";
-  const userRole = role === "admin" ? "Administrator" : "Siswa Kelas 11 IPA 2";
+  // Dynamic nav items based on role
+  const navItems = role === "admin"
+    ? (admin?.posisi === "Pelaksana" ? pelaksanaNavItems : adminSystemNavItems)
+    : studentNavItems;
+  
+  // Get user info from auth context
+  const userName = role === "admin" 
+    ? (admin?.nama_admin || "Admin") 
+    : (siswa?.nama || "Siswa");
+  const userRole = role === "admin" 
+    ? (admin?.posisi || "Administrator") 
+    : (siswa?.kelas || "Siswa");
 
-  const handleLogout = () => {
-    navigate("/");
+  const handleLogoutClick = () => {
+    setLogoutDialogOpen(true);
+  };
+
+  const handleLogoutConfirm = () => {
+    logout();
+    toast.success("Logout berhasil", {
+      description: "Sampai jumpa kembali!",
+    });
+    navigate("/login");
+  };
+
+  const handleProfileClick = () => {
+    if (role === "admin") {
+      navigate("/admin/profile");
+    } else {
+      navigate("/student/profile");
+    }
   };
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Logout Confirmation Dialog */}
+      <LogoutConfirmDialog 
+        open={logoutDialogOpen} 
+        onOpenChange={setLogoutDialogOpen}
+        onConfirm={handleLogoutConfirm}
+      />
+
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
@@ -81,12 +133,12 @@ export function Layout({ children, role }: LayoutProps) {
           {/* Logo */}
           <div className="flex items-center justify-between p-6 border-b border-sidebar-border">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <FileText className="w-5 h-5 text-primary-foreground" />
+              <div className="w-10 h-10 rounded-xl overflow-hidden bg-white/10">
+                <img src="/assets/logo.png" alt="SUSI SAKUCI" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h1 className="font-bold text-sidebar-foreground">Aspirasi</h1>
-                <p className="text-xs text-sidebar-foreground/60">SMA Negeri 1</p>
+                <h1 className="font-bold text-sidebar-foreground">SUSI SAKUCI</h1>
+                <p className="text-xs text-sidebar-foreground/60">Suara Siswa</p>
               </div>
             </div>
             <button
@@ -123,8 +175,8 @@ export function Layout({ children, role }: LayoutProps) {
           {/* User section */}
           <div className="p-4 border-t border-sidebar-border">
             <button
-              onClick={handleLogout}
-              className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all"
+              onClick={handleLogoutClick}
+              className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-all"
             >
               <LogOut className="w-5 h-5" />
               Keluar
@@ -154,12 +206,7 @@ export function Layout({ children, role }: LayoutProps) {
             </div>
 
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="w-5 h-5" />
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
-                  3
-                </span>
-              </Button>
+              <NotificationBell />
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -178,12 +225,12 @@ export function Layout({ children, role }: LayoutProps) {
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>Akun Saya</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleProfileClick}>
                     <User className="w-4 h-4 mr-2" />
                     Profil
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                  <DropdownMenuItem onClick={handleLogoutClick} className="text-destructive">
                     <LogOut className="w-4 h-4 mr-2" />
                     Keluar
                   </DropdownMenuItem>

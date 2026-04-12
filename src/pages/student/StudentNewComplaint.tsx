@@ -1,48 +1,116 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Layout } from "@/components/Layout";
+import { StudentLayout } from "@/components/StudentLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Upload, X, Send, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Upload, Send, Loader2, X, Image } from "lucide-react";
 import { toast } from "sonner";
-
-const categories = [
-  { value: "ruang-kelas", label: "Ruang Kelas" },
-  { value: "toilet", label: "Toilet" },
-  { value: "lab-komputer", label: "Lab Komputer" },
-  { value: "perpustakaan", label: "Perpustakaan" },
-  { value: "kantin", label: "Kantin" },
-  { value: "fasilitas-umum", label: "Fasilitas Umum" },
-  { value: "lainnya", label: "Lainnya" },
-];
+import { useAuth } from "@/contexts/AuthContext";
+import { useKategoriList } from "@/hooks/useApi";
+import api from "@/lib/api";
 
 export default function StudentNewComplaint() {
   const navigate = useNavigate();
+  const { siswa } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    title: "",
-    category: "",
-    location: "",
-    description: "",
+    id_kategori: "",
+    lokasi: "",
+    keterangan: "",
   });
+
+  // Fetch categories from API
+  const { data: kategoriData, isLoading: loadingKategori } = useKategoriList();
+  const categories = kategoriData?.data || [];
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
+      if (!validTypes.includes(file.type)) {
+        toast.error("Format file tidak valid", {
+          description: "Gunakan format JPG, PNG, atau GIF",
+        });
+        return;
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("File terlalu besar", {
+          description: "Maksimal ukuran file adalah 5MB",
+        });
+        return;
+      }
+
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!siswa?.nis) {
+      toast.error("Error", { description: "Anda harus login terlebih dahulu" });
+      return;
+    }
+
+    if (!formData.id_kategori || !formData.lokasi || !formData.keterangan) {
+      toast.error("Error", { description: "Mohon lengkapi semua field yang wajib" });
+      return;
+    }
+
     setIsSubmitting(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      // Use FormData for file upload
+      const submitData = new FormData();
+      submitData.append('nis', String(siswa.nis));
+      submitData.append('id_kategori', formData.id_kategori);
+      submitData.append('lokasi', formData.lokasi);
+      submitData.append('keterangan', formData.keterangan);
+      
+      if (selectedFile) {
+        submitData.append('foto_dokumentasi', selectedFile);
+      }
 
-    toast.success("Pengaduan berhasil dikirim!", {
-      description: "Tim kami akan segera meninjau laporan Anda.",
-    });
+      await api.post('/input-aspirasi', submitData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
-    setIsSubmitting(false);
-    navigate("/student/complaints");
+      toast.success("Pengaduan berhasil dikirim!", {
+        description: "Tim kami akan segera meninjau laporan Anda.",
+      });
+
+      navigate("/student/complaints");
+    } catch (error: any) {
+      toast.error("Gagal mengirim pengaduan", {
+        description: error.response?.data?.message || "Terjadi kesalahan",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (field: string, value: string) => {
@@ -50,7 +118,7 @@ export default function StudentNewComplaint() {
   };
 
   return (
-    <Layout role="student">
+    <StudentLayout>
       <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
         {/* Back button */}
         <Button variant="ghost" className="gap-2" onClick={() => navigate("/student")}>
@@ -67,33 +135,21 @@ export default function StudentNewComplaint() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Title */}
-              <div className="space-y-2">
-                <Label htmlFor="title">Judul Pengaduan *</Label>
-                <Input
-                  id="title"
-                  placeholder="Contoh: AC Ruang Kelas Rusak"
-                  value={formData.title}
-                  onChange={(e) => handleChange("title", e.target.value)}
-                  required
-                />
-              </div>
-
               {/* Category */}
               <div className="space-y-2">
                 <Label>Kategori *</Label>
                 <Select
-                  value={formData.category}
-                  onValueChange={(value) => handleChange("category", value)}
-                  required
+                  value={formData.id_kategori}
+                  onValueChange={(value) => handleChange("id_kategori", value)}
+                  disabled={loadingKategori}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Pilih kategori" />
+                    <SelectValue placeholder={loadingKategori ? "Memuat..." : "Pilih kategori"} />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((cat) => (
-                      <SelectItem key={cat.value} value={cat.value}>
-                        {cat.label}
+                      <SelectItem key={cat.id_kategori} value={String(cat.id_kategori)}>
+                        {cat.ket_kategori}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -102,24 +158,24 @@ export default function StudentNewComplaint() {
 
               {/* Location */}
               <div className="space-y-2">
-                <Label htmlFor="location">Lokasi *</Label>
+                <Label htmlFor="lokasi">Lokasi *</Label>
                 <Input
-                  id="location"
+                  id="lokasi"
                   placeholder="Contoh: Gedung A Lantai 2, Ruang 201"
-                  value={formData.location}
-                  onChange={(e) => handleChange("location", e.target.value)}
+                  value={formData.lokasi}
+                  onChange={(e) => handleChange("lokasi", e.target.value)}
                   required
                 />
               </div>
 
               {/* Description */}
               <div className="space-y-2">
-                <Label htmlFor="description">Deskripsi *</Label>
+                <Label htmlFor="keterangan">Keterangan / Deskripsi *</Label>
                 <Textarea
-                  id="description"
+                  id="keterangan"
                   placeholder="Jelaskan detail permasalahan yang kamu temui..."
-                  value={formData.description}
-                  onChange={(e) => handleChange("description", e.target.value)}
+                  value={formData.keterangan}
+                  onChange={(e) => handleChange("keterangan", e.target.value)}
                   className="min-h-[150px]"
                   required
                 />
@@ -127,16 +183,57 @@ export default function StudentNewComplaint() {
 
               {/* File upload */}
               <div className="space-y-2">
-                <Label>Foto (Opsional)</Label>
-                <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer">
-                  <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-sm font-medium text-foreground mb-1">
-                    Klik untuk upload atau drag & drop
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    PNG, JPG hingga 5MB (maksimal 3 foto)
-                  </p>
-                </div>
+                <Label>Foto Dokumentasi (Opsional)</Label>
+                
+                {!selectedFile ? (
+                  <div 
+                    className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-sm font-medium text-foreground mb-1">
+                      Klik untuk upload atau drag & drop
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      PNG, JPG, GIF hingga 5MB
+                    </p>
+                  </div>
+                ) : (
+                  <div className="relative border rounded-lg p-4">
+                    <div className="flex items-center gap-4">
+                      {previewUrl && (
+                        <img 
+                          src={previewUrl} 
+                          alt="Preview" 
+                          className="w-20 h-20 object-cover rounded-lg"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{selectedFile.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleRemoveFile}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/jpg,image/gif"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
               </div>
 
               {/* Submit buttons */}
@@ -156,7 +253,7 @@ export default function StudentNewComplaint() {
                 >
                   {isSubmitting ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" />
                       Mengirim...
                     </>
                   ) : (
@@ -171,6 +268,6 @@ export default function StudentNewComplaint() {
           </CardContent>
         </Card>
       </div>
-    </Layout>
+    </StudentLayout>
   );
 }

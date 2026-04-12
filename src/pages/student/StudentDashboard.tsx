@@ -1,46 +1,50 @@
-import { Layout } from "@/components/Layout";
+import { StudentLayout } from "@/components/StudentLayout";
 import { StatCard } from "@/components/StatCard";
 import { ComplaintCard } from "@/components/ComplaintCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Clock, CheckCircle2, PlusCircle, ArrowRight, Megaphone } from "lucide-react";
+import { FileText, Clock, CheckCircle2, PlusCircle, ArrowRight, Megaphone, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useInputAspirasiBySiswa } from "@/hooks/useApi";
+import type { ComplaintStatus } from "@/components/StatusBadge";
 
-const myComplaints = [
-  {
-    id: "1",
-    title: "AC Ruang Kelas XI IPA 1 Rusak",
-    description: "AC di ruang kelas tidak berfungsi sejak seminggu yang lalu, membuat suasana belajar tidak nyaman.",
-    category: "Ruang Kelas",
-    location: "Gedung A Lantai 2",
-    status: "in_progress" as const,
-    date: "13 Jan 2026",
-  },
-  {
-    id: "2",
-    title: "Meja Belajar Goyang",
-    description: "Beberapa meja di kelas goyang karena kakinya tidak rata.",
-    category: "Ruang Kelas",
-    location: "Gedung A Lantai 2",
-    status: "completed" as const,
-    date: "5 Jan 2026",
-  },
-  {
-    id: "3",
-    title: "Lampu Kelas Berkedip",
-    description: "Lampu di bagian depan kelas sering berkedip dan mengganggu konsentrasi.",
-    category: "Ruang Kelas",
-    location: "Gedung A Lantai 2",
-    status: "pending" as const,
-    date: "2 Jan 2026",
-  },
-];
+// Map database status to UI status
+const mapStatus = (status: string | undefined): ComplaintStatus => {
+  switch (status) {
+    case 'Menunggu': return 'pending';
+    case 'Proses': return 'in_progress';
+    case 'Selesai': return 'completed';
+    default: return 'pending';
+  }
+};
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
+  const { siswa } = useAuth();
+  
+  // Fetch complaints for logged-in student
+  const { data: complaintsData, isLoading } = useInputAspirasiBySiswa(siswa?.nis || 0);
+  
+  const complaints = complaintsData?.data || [];
+  
+  // Calculate stats
+  const totalComplaints = complaints.length;
+  const pendingCount = complaints.filter(c => 
+    !c.aspirasi || c.aspirasi.length === 0 || c.aspirasi.some(a => a.status === 'Menunggu')
+  ).length;
+  const inProgressCount = complaints.filter(c => 
+    c.aspirasi?.some(a => a.status === 'Proses')
+  ).length;
+  const completedCount = complaints.filter(c => 
+    c.aspirasi?.some(a => a.status === 'Selesai')
+  ).length;
+  
+  // Get recent 3 complaints
+  const recentComplaints = complaints.slice(0, 3);
 
   return (
-    <Layout role="student">
+    <StudentLayout>
       <div className="space-y-6 animate-fade-in">
         {/* Welcome Banner */}
         <Card className="hero-gradient text-primary-foreground overflow-hidden relative">
@@ -54,7 +58,7 @@ export default function StudentDashboard() {
                   <span className="text-sm font-medium opacity-80">Portal Aspirasi Siswa</span>
                 </div>
                 <h1 className="text-2xl md:text-3xl font-bold mb-2">
-                  Hai, Ahmad! Ada Keluhan?
+                  Hai, {siswa?.nama?.split(' ')[0] || 'Siswa'}! Ada Keluhan?
                 </h1>
                 <p className="opacity-80 max-w-md">
                   Sampaikan aspirasimu tentang sarana dan prasarana sekolah. Kami siap mendengar dan menindaklanjuti!
@@ -77,21 +81,21 @@ export default function StudentDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <StatCard
             title="Total Pengaduan"
-            value={3}
+            value={totalComplaints}
             description="Pengaduan yang kamu buat"
             icon={FileText}
             variant="primary"
           />
           <StatCard
             title="Sedang Diproses"
-            value={1}
+            value={inProgressCount + pendingCount}
             description="Dalam penanganan"
             icon={Clock}
             variant="info"
           />
           <StatCard
             title="Selesai"
-            value={1}
+            value={completedCount}
             description="Sudah ditangani"
             icon={CheckCircle2}
             variant="success"
@@ -112,15 +116,39 @@ export default function StudentDashboard() {
             </Button>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {myComplaints.map((complaint) => (
-                <ComplaintCard
-                  key={complaint.id}
-                  {...complaint}
-                  onClick={() => navigate(`/student/complaints/${complaint.id}`)}
-                />
-              ))}
-            </div>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : recentComplaints.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Belum ada pengaduan</p>
+                <Button 
+                  variant="link" 
+                  className="mt-2"
+                  onClick={() => navigate("/student/new")}
+                >
+                  Buat pengaduan pertamamu
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {recentComplaints.map((complaint) => (
+                  <ComplaintCard
+                    key={complaint.id_pelaporan}
+                    id={String(complaint.id_pelaporan)}
+                    title={complaint.keterangan.substring(0, 50) + (complaint.keterangan.length > 50 ? '...' : '')}
+                    description={complaint.keterangan}
+                    category={complaint.kategori?.ket_kategori || 'Umum'}
+                    location={complaint.lokasi}
+                    status={mapStatus(complaint.aspirasi?.[0]?.status)}
+                    date={new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    onClick={() => navigate(`/student/complaints/${complaint.id_pelaporan}`)}
+                  />
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -145,6 +173,6 @@ export default function StudentDashboard() {
           </CardContent>
         </Card>
       </div>
-    </Layout>
+    </StudentLayout>
   );
 }
