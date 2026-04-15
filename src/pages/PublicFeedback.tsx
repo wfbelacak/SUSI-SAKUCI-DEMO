@@ -115,7 +115,7 @@ export default function PublicFeedback() {
                 <Link to="/">
                   <Button variant="outline" className="w-full">
                     <ArrowLeft className="w-4 h-4 mr-2" />
-                    Kembali ke Login
+                    Kembali Beranda
                   </Button>
                 </Link>
               </div>
